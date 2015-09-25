@@ -83,6 +83,9 @@ projects using sqlite."
 (defvar pony-filesystem-ceiling (if (eq 'windows-nt system-type)
                                     "c:/" "/"))
 
+(defvar pony-last-project-root nil)
+
+
 ;; Dependancies and environment sniffing
 (require 'cl)
 (require 'dired-aux)
@@ -125,7 +128,9 @@ found in or under PATH"
 (defun pony-locate (filepath)
   "Essentially duplicates the functionality of `locate-dominating-file'
 but allows paths rather than filenames"
-  (let ((dir (expand-file-name default-directory))
+  (let ((dir (expand-file-name (if (pony-buffer-match)
+								   pony-last-project-root
+								 default-directory)))
         (found nil))
     (while (and (not (equal pony-filesystem-ceiling dir))
                 (not found))
@@ -244,13 +249,18 @@ more conservative local-var manipulation."
 
 (defstruct pony-project python settings pythonpath appsdir)
 
+(defun pony-buffer-match ()
+  "Checking whether current buffer is pony proccess buffer"
+  (string-match "^*pony.**$" (buffer-name)))
+
 (defun pony-configfile-p ()
   "Establish whether this project has a .ponyrc file in the root"
   (if (equal 'dired-mode major-mode)
       (if (pony-locate ".dir-locals.el") t nil)
     (if (or
          (and (buffer-file-name) (dir-locals-find-file (buffer-file-name)))
-         (pony-rooted-sym-p '.ponyrc))
+         (pony-rooted-sym-p '.ponyrc)
+		 (pony-buffer-match))
         t nil)))
 
 (defun pony-rc ()
@@ -329,7 +339,9 @@ variables; if not found, evaluate .ponyrc instead."
               (progn
                 (setq curdir (concat curdir "../"))
                 (setq max (- max 1))))))
-        (if found (expand-file-name curdir))))))
+        (if found
+			(setq pony-last-project-root (expand-file-name curdir))
+		  pony-last-project-root)))))
 
 (defun pony-project-newstructure-p()
   "Predicate to determine whether the project has new structure.
